@@ -25,6 +25,7 @@
 package me.blvckbytes.gpeee.interpreter;
 
 import me.blvckbytes.gpeee.parser.MathOperation;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -38,6 +39,8 @@ public interface IValueInterpreter {
   double asDouble(@Nullable Object value);
 
   String asString(@Nullable Object value);
+
+  Component asComponent(@Nullable Object value);
 
   List<Object> asCollection(@Nullable Object value);
 

@@ -26,6 +26,7 @@ package me.blvckbytes.gpeee.functions;
 
 import me.blvckbytes.gpeee.Tuple;
 import me.blvckbytes.gpeee.interpreter.IValueInterpreter;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -128,6 +129,9 @@ public class ExpressionFunctionArgument {
   private @Nullable Object tryConvertValue(@NotNull Object value, Class<?> targetType, IValueInterpreter valueInterpreter) {
     if (targetType == String.class)
       return valueInterpreter.asString(value);
+
+    if (targetType == Component.class)
+      return valueInterpreter.asComponent(value);
 
     if (targetType == Long.class)
       return valueInterpreter.asLong(value);

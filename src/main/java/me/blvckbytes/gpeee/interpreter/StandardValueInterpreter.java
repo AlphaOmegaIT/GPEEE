@@ -25,6 +25,8 @@
 package me.blvckbytes.gpeee.interpreter;
 
 import me.blvckbytes.gpeee.parser.MathOperation;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Array;
@@ -47,29 +49,38 @@ public class StandardValueInterpreter implements IValueInterpreter {
 
   @Override
   public long asLong(@Nullable Object value) {
-    if (value == null)
-      return 0;
+      switch (value) {
+          case null -> {
+              return 0;
+          }
+          case Long l -> {
+              return l;
+          }
 
-    if (value instanceof Long)
-      return ((Long) value);
+          // Is a boolean, true equals one, false zero
+          case Boolean b -> {
+              return b ? 1 : 0;
+          }
 
-    // Is a boolean, true equals one, false zero
-    if (value instanceof Boolean)
-      return ((Boolean) value) ? 1 : 0;
+          // Is any other number, get it's value as a long
+          case Number number -> {
+              return number.longValue();
+          }
 
-    // Is any other number, get it's value as a long
-    if (value instanceof Number)
-      return ((Number) value).longValue();
+          // A collection will be zero if empty and one otherwise
+          case Collection<?> collection -> {
+              return collection.isEmpty() ? 0 : 1;
+          }
 
-    // A collection will be zero if empty and one otherwise
-    if (value instanceof Collection)
-      return ((Collection<?>) value).size() == 0 ? 0 : 1;
+          // A map will be zero if empty and one otherwise
+          case Map<?, ?> map -> {
+              return map.isEmpty() ? 0 : 1;
+          }
+          default -> {
+          }
+      }
 
-    // A map will be zero if empty and one otherwise
-    if (value instanceof Map)
-      return ((Map<?, ?>) value).size() == 0 ? 0 : 1;
-
-    // An array will be zero if empty and one otherwise
+      // An array will be zero if empty and one otherwise
     if (value.getClass().isArray())
       return Array.getLength(value) == 0 ? 0 : 1;
 
@@ -90,60 +101,73 @@ public class StandardValueInterpreter implements IValueInterpreter {
 
   @Override
   public double asDouble(@Nullable Object value) {
-    if (value == null)
-      return 0;
+      return switch (value) {
+          case null -> 0;
+          case Double v -> v;
 
-    if (value instanceof Double)
-      return ((Double) value);
+          // Is any other number, get it's value as a double
+          case Number number -> number.doubleValue();
+          default ->
 
-    // Is any other number, get it's value as a double
-    if (value instanceof Number)
-      return ((Number) value).doubleValue();
+              // Interpret as long and implicitly cast to a double
+                  asLong(value);
+      };
 
-    // Interpret as long and implicitly cast to a double
-    return asLong(value);
   }
 
   @Override
   public String asString(@Nullable Object value) {
-    if (value == null)
-      return "<null>";
+      switch (value) {
+          case null -> {
+              return "<null>";
+          }
+          case String s -> {
+              return s;
+          }
 
-    if (value instanceof String)
-      return ((String) value);
+          // Transform a map to a list of it's entries
+          case Map<?, ?> map -> {
+              return asString(new ArrayList<>(map.entrySet()));
+          }
 
-    // Transform a map to a list of it's entries
-    if (value instanceof Map) {
-      Map<?, ?> map = (Map<?, ?>) value;
-      return asString(new ArrayList<>(map.entrySet()));
-    }
 
-    // Stringify map entries
-    if (value instanceof Map.Entry) {
-      Map.Entry<?, ?> entry = (Map.Entry<?, ?>) value;
-      return "(" + asString(entry.getKey()) + " -> " + asString(entry.getValue()) + ")";
-    }
-
-    if (value instanceof Collection<?> || value.getClass().isArray()) {
-      StringBuilder result = new StringBuilder();
-
-      if (value.getClass().isArray()) {
-        for (int i = 0; i < Array.getLength(value); i++)
-          result.append(i == 0 ? "" : ", ").append(asString(Array.get(value, i)));
+          // Stringify map entries
+          case Map.Entry<?, ?> entry -> {
+              return "(" + asString(entry.getKey()) + " -> " + asString(entry.getValue()) + ")";
+          }
+          default -> {
+          }
       }
 
-      else {
-        int i = 0;
-        for (Object item : ((Collection<?>) value)) {
-          result.append(i == 0 ? "" : ", ").append(asString(item));
-          i++;
+      if (value instanceof Collection<?> || value.getClass().isArray()) {
+        StringBuilder result = new StringBuilder();
+
+        if (value.getClass().isArray()) {
+          for (int i = 0; i < Array.getLength(value); i++)
+            result.append(i == 0 ? "" : ", ").append(asString(Array.get(value, i)));
+        } else {
+          int i = 0;
+          for (Object item : ((Collection<?>) value)) {
+            result.append(i == 0 ? "" : ", ").append(asString(item));
+            i++;
+          }
         }
-      }
 
-      return "[" + result + "]";
-    }
+        return "[" + result + "]";
+      }
 
     return value.toString();
+  }
+
+  @Override
+  public Component asComponent(@Nullable Object value) {
+    if (value == null)
+      return MiniMessage.miniMessage().deserialize("<red><undefined></red>");
+
+    if (value instanceof Component component)
+      return component;
+
+    return MiniMessage.miniMessage().deserialize(value.toString());
   }
 
   @Override
@@ -185,10 +209,9 @@ public class StandardValueInterpreter implements IValueInterpreter {
       return false;
 
     // Both values are of type string, specific rules apply
-    if (a instanceof String && b instanceof String) {
-      String sA = (String) a, sB = (String) b;
+    if (a instanceof String sA && b instanceof String sB) {
 
-      // In non-strict mode, they are compared ignoring case and whitespace padding
+        // In non-strict mode, they are compared ignoring case and whitespace padding
       return strict ? sA.equals(sB) : sA.trim().equalsIgnoreCase(sB.trim());
     }
 
@@ -224,10 +247,9 @@ public class StandardValueInterpreter implements IValueInterpreter {
       return false;
 
     // Both values are a collection, compare their type and contents
-    if (a instanceof Collection && b instanceof Collection) {
-      Collection<?> cA = (Collection<?>) a, cB = (Collection<?>) b;
+    if (a instanceof Collection<?> cA && b instanceof Collection<?> cB) {
 
-      // Cannot equal as they have a different number of items
+        // Cannot equal as they have a different number of items
       if (cA.size() != cB.size())
         return false;
 
@@ -235,10 +257,9 @@ public class StandardValueInterpreter implements IValueInterpreter {
     }
 
     // Both values are a map, compare their type and entry sets
-    if (a instanceof Map && b instanceof Map) {
-      Map<?, ?> mA = (Map<?, ?>) a, mB = (Map<?, ?>) b;
+    if (a instanceof Map<?, ?> mA && b instanceof Map<?, ?> mB) {
 
-      // Cannot equal as they have a different number of items
+        // Cannot equal as they have a different number of items
       if (mA.size() != mB.size())
         return false;
 
